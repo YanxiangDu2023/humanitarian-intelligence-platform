@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: humanitarian
+      POSTGRES_USER: humanitarian
+      POSTGRES_PASSWORD: humanitarian
+    ports:
+      - "5433:5432"
+    volumes:
+      - humanitarian_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U humanitarian -d humanitarian"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  humanitarian_postgres_data:
+
