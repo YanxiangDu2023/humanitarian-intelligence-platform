@@ -88,14 +88,21 @@ class OpenAICountryBriefGenerator:
                     {
                         "role": "system",
                         "content": (
-                            "You write concise, neutral humanitarian country briefs from a "
+                            "You write detailed but focused, neutral humanitarian country briefs from a "
                             "closed evidence package. Use only the supplied evidence. Do not add "
                             "causes, forecasts, policy recommendations, or external facts. Do not "
                             "write digits or numeric values in prose; the application will attach "
                             "verified values separately. Every finding must cite one to three exact "
                             "indicator_code values from the evidence. Raw-value rank is descriptive: "
                             "a higher value is not always better. Treat survey snapshots as single "
-                            "observations, not trends."
+                            "observations, not trends. Write an executive summary of three to four "
+                            "sentences. For each finding, write two to three sentences that explain "
+                            "the observed direction, the position relative to the comparison cohort "
+                            "when available, and any relevant evidence limitation. Aim for two or "
+                            "three strengths and three or four risks when the evidence supports them, "
+                            "without repeating the same point. Cover learning outcomes, enrollment, "
+                            "education spending, digital access, and population context where the "
+                            "evidence permits. Return fewer findings rather than inventing a claim."
                         ),
                     },
                     {"role": "user", "content": evidence_json},

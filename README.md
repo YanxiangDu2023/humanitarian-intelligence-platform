@@ -105,7 +105,9 @@ The POST country-brief endpoint sends that closed evidence package to the config
 model, validates the response, and saves the structured brief in PostgreSQL. The GET endpoint
 returns the latest saved brief without calling the model, so refreshing the dashboard does not
 incur another API charge. AI-written prose is not allowed to contain numbers; verified values,
-years, ranks, and sources are attached by the application after generation.
+years, ranks, and sources are attached by the application after generation. Briefs use a
+multi-sentence executive summary and evidence-supported findings across the available education,
+learning, connectivity, spending, and population domains.
 
 Start the React dashboard in a second terminal:
 
