@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     unicef_end_year: int = 2025
     http_timeout_seconds: float = Field(default=30, gt=0)
     openai_api_key: SecretStr | None = None
-    openai_model: str = "gpt-6.1-sol"
+    openai_model: str = "gpt-6-luna"
 
     @property
     def countries(self) -> tuple[str, ...]:
