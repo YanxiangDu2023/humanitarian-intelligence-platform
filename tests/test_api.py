@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
@@ -215,5 +216,61 @@ def test_creates_grounded_country_brief() -> None:
     assert payload["model"] == "test-model"
     assert payload["risks"][0]["evidence"][0]["value"] == 35.0
     assert payload["risks"][0]["evidence"][0]["year"] == 2024
+    assert payload["generated_at"] is not None
+    assert payload["cached"] is False
     generator.generate.assert_called_once()
+    assert any(
+        "INSERT INTO gold.ai_country_briefs" in call.args[0]
+        for call in client.app.dependency_overrides[get_connection]().__next__().execute.call_args_list
+    )
+    app.dependency_overrides.clear()
+
+
+def test_returns_latest_saved_country_brief() -> None:
+    generated_at = datetime(2026, 10, 15, 8, 0, tzinfo=UTC)
+    saved_brief = {
+        "country_iso3": "KEN",
+        "country_name": "Kenya",
+        "model": "gpt-6-luna",
+        "executive_summary": "Digital access remains constrained.",
+        "strengths": [],
+        "risks": [],
+        "data_limitations": ["A limited series is available."],
+        "methodology_notes": ["Use reported values carefully."],
+        "generated_at": generated_at.isoformat(),
+    }
+    connection = MagicMock()
+    connection.execute.return_value.fetchone.return_value = {
+        "brief": saved_brief,
+        "generated_at": generated_at,
+    }
+
+    def override_connection() -> Iterator[MagicMock]:
+        yield connection
+
+    app.dependency_overrides[get_connection] = override_connection
+    client = TestClient(app)
+
+    response = client.get("/api/v1/ai/country-brief/ken")
+
+    assert response.status_code == 200
+    assert response.json()["cached"] is True
+    assert response.json()["model"] == "gpt-6-luna"
+    app.dependency_overrides.clear()
+
+
+def test_missing_saved_country_brief_returns_404() -> None:
+    connection = MagicMock()
+    connection.execute.return_value.fetchone.return_value = None
+
+    def override_connection() -> Iterator[MagicMock]:
+        yield connection
+
+    app.dependency_overrides[get_connection] = override_connection
+    client = TestClient(app)
+
+    response = client.get("/api/v1/ai/country-brief/KEN")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "No saved AI brief found"}
     app.dependency_overrides.clear()

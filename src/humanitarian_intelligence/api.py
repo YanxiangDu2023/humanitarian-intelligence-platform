@@ -1,4 +1,6 @@
 from collections.abc import Iterator
+from datetime import UTC, datetime
+from hashlib import sha256
 from typing import Annotated
 
 import psycopg
@@ -382,7 +384,8 @@ def create_country_brief(
     analysis = get_country_analysis(request.country_iso3, connection)
     try:
         draft = generator.generate(analysis.model_dump_json())
-        return ground_country_brief(
+        generated_at = datetime.now(UTC)
+        brief = ground_country_brief(
             draft,
             country_iso3=analysis.country_iso3,
             country_name=analysis.country_name,
@@ -391,8 +394,64 @@ def create_country_brief(
             data_gaps=list(analysis.data_gaps),
             methodology_notes=analysis.methodology_notes,
         )
+        brief.generated_at = generated_at
+        evidence_sha256 = sha256(analysis.model_dump_json().encode("utf-8")).hexdigest()
+        connection.execute(
+            """
+            INSERT INTO gold.ai_country_briefs (
+                country_iso3,
+                country_name,
+                model,
+                evidence_sha256,
+                brief,
+                generated_at
+            )
+            VALUES (%s, %s, %s, %s, %s::jsonb, %s)
+            """,
+            (
+                brief.country_iso3,
+                brief.country_name,
+                brief.model,
+                evidence_sha256,
+                brief.model_dump_json(exclude={"cached"}),
+                generated_at,
+            ),
+        )
+        return brief
     except CountryBriefGenerationError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.get(
+    "/api/v1/ai/country-brief/{country_iso3}",
+    response_model=CountryBriefResponse,
+    tags=["ai"],
+)
+def get_latest_country_brief(
+    country_iso3: str,
+    connection: DatabaseConnection,
+) -> CountryBriefResponse:
+    normalized_country = country_iso3.upper()
+    if len(normalized_country) != 3 or not normalized_country.isalpha():
+        raise HTTPException(status_code=422, detail="Country must use a three-letter ISO3 code")
+
+    row = connection.execute(
+        """
+        SELECT brief, generated_at
+        FROM gold.ai_country_briefs
+        WHERE country_iso3 = %s
+        ORDER BY generated_at DESC
+        LIMIT 1
+        """,
+        (normalized_country,),
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="No saved AI brief found")
+
+    brief = CountryBriefResponse.model_validate(row["brief"])
+    brief.generated_at = row["generated_at"]
+    brief.cached = True
+    return brief
 
 
 @app.get(

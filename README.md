@@ -47,6 +47,9 @@ UNICEF SDMX API ┘              |
                                |
                                v
                     gold.country_indicator_summary  latest/change metrics
+                               |
+                               v
+                    gold.ai_country_briefs          versioned AI reports
 ```
 
 `meta.pipeline_runs` records status, timestamps, row counts, and errors for each execution.
@@ -92,14 +95,17 @@ endpoints are:
 - `GET /api/v1/countries/{country_iso3}/indicators`
 - `GET /api/v1/analysis/countries/{country_iso3}`
 - `POST /api/v1/ai/country-brief`
+- `GET /api/v1/ai/country-brief/{country_iso3}`
 
 The analysis endpoint prepares a deterministic, model-ready evidence package containing
 latest values, historical changes, available years, cohort statistics, and explicit data
 gaps. It does not call an AI model or incur model API costs.
 
-The country-brief endpoint sends that closed evidence package to the configured OpenAI
-model and returns a structured brief. AI-written prose is not allowed to contain numbers;
-verified values, years, ranks, and sources are attached by the application after generation.
+The POST country-brief endpoint sends that closed evidence package to the configured OpenAI
+model, validates the response, and saves the structured brief in PostgreSQL. The GET endpoint
+returns the latest saved brief without calling the model, so refreshing the dashboard does not
+incur another API charge. AI-written prose is not allowed to contain numbers; verified values,
+years, ranks, and sources are attached by the application after generation.
 
 Start the React dashboard in a second terminal:
 

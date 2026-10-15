@@ -12,9 +12,14 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
-async function fetchJson(path, signal) {
-  const response = await fetch(`${API_BASE}${path}`, { signal });
-  if (!response.ok) throw new Error(`API returned ${response.status}`);
+async function fetchJson(path, signal, options = {}) {
+  const response = await fetch(`${API_BASE}${path}`, { ...options, signal });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const error = new Error(payload.detail || `API returned ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
   return response.json();
 }
 
@@ -106,6 +111,55 @@ function CountryProfile({ country, countryCode, rows, indicatorCode, selectIndic
   </article>;
 }
 
+function FindingCard({ finding, tone }) {
+  return <article className={`finding-card ${tone}`}>
+    <div className="finding-heading"><span>{tone === "strength" ? "+" : "!"}</span>
+      <h3>{finding.title}</h3></div>
+    <p>{finding.analysis}</p>
+    <div className="evidence-list">{finding.evidence.map((item) => <div
+      className="evidence-item" key={item.indicator_code}
+    >
+      <span>{item.indicator_name}</span>
+      <strong>{formatValue(item.value, item.unit)} {item.unit}</strong>
+      <small>{item.year} · {sourceLabel(item.source_name)} · rank {item.value_rank_descending}/{item.cohort_size}</small>
+    </div>)}</div>
+  </article>;
+}
+
+function AIBriefPanel({ country, brief, loading, generating, error, generate }) {
+  const buttonLabel = generating ? "Generating…" : brief ? "Regenerate analysis" : "Generate AI analysis";
+  return <section className="panel ai-panel">
+    <header className="panel-header ai-header"><div><span className="section-kicker">Grounded AI country brief</span>
+      <h2>{country?.country_name || "Country"} evidence synthesis</h2></div>
+      <button type="button" className="ai-action" disabled={generating || loading} onClick={generate}>
+        {generating && <span className="button-spinner" />}{buttonLabel}
+      </button></header>
+    {loading ? <div className="ai-empty"><span className="spinner" /> Loading saved analysis…</div>
+      : error ? <div className="ai-message error-state"><strong>AI analysis unavailable</strong><span>{error}</span></div>
+        : !brief ? <div className="ai-empty"><div className="ai-orb">AI</div><div>
+          <strong>No saved analysis for this country yet.</strong>
+          <span>Generate one grounded in the verified indicators below. The result will be saved and reused.</span>
+        </div></div>
+          : <div className="brief-content">
+            <div className="brief-summary"><span>Executive summary</span><p>{brief.executive_summary}</p>
+              <small>{brief.cached ? "Saved report" : "New report"} · {brief.model}
+                {brief.generated_at && ` · ${new Date(brief.generated_at).toLocaleString()}`}</small></div>
+            <div className="brief-columns"><div><h3>Strengths</h3>
+              {brief.strengths.length ? brief.strengths.map((finding) => <FindingCard
+                key={finding.title} finding={finding} tone="strength" />)
+                : <p className="brief-placeholder">No evidence-supported strength was identified.</p>}</div>
+              <div><h3>Risks and constraints</h3>
+                {brief.risks.length ? brief.risks.map((finding) => <FindingCard
+                  key={finding.title} finding={finding} tone="risk" />)
+                  : <p className="brief-placeholder">No evidence-supported risk was identified.</p>}</div></div>
+            <details className="brief-notes"><summary>Data limitations and methodology</summary>
+              <div><ul>{[...new Set(brief.data_limitations)].map((note) => <li key={note}>{note}</li>)}</ul>
+                <ul>{brief.methodology_notes.map((note) => <li key={note}>{note}</li>)}</ul></div>
+            </details>
+          </div>}
+  </section>;
+}
+
 const TREND_COLORS = ["#168c91", "#ef6c4d", "#526b9a"];
 const AVAILABLE_YEARS = Array.from({ length: 8 }, (_, index) => 2018 + index);
 
@@ -194,6 +248,10 @@ function App() {
   const [trendRows, setTrendRows] = useState([]);
   const [trendLoading, setTrendLoading] = useState(true);
   const [trendError, setTrendError] = useState("");
+  const [brief, setBrief] = useState(null);
+  const [briefLoading, setBriefLoading] = useState(true);
+  const [briefGenerating, setBriefGenerating] = useState(false);
+  const [briefError, setBriefError] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -230,6 +288,21 @@ function App() {
     return () => controller.abort();
   }, [indicatorCode, trendCountries, trendStartYear, trendEndYear, reload]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    setBriefLoading(true);
+    setBriefError("");
+    fetchJson(`/api/v1/ai/country-brief/${countryCode}`, controller.signal)
+      .then(setBrief)
+      .catch((requestError) => {
+        if (requestError.name === "AbortError") return;
+        if (requestError.status === 404) setBrief(null);
+        else setBriefError(requestError.message);
+      })
+      .finally(() => setBriefLoading(false));
+    return () => controller.abort();
+  }, [countryCode]);
+
   const country = countries.find((item) => item.country_iso3 === countryCode);
   const indicator = indicators.find((item) => item.indicator_code === indicatorCode);
   const observation = countryData.find((item) => item.indicator_code === indicatorCode);
@@ -261,6 +334,23 @@ function App() {
     });
   }
 
+  async function generateBrief() {
+    setBriefGenerating(true);
+    setBriefError("");
+    try {
+      const generated = await fetchJson("/api/v1/ai/country-brief", undefined, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ country_iso3: countryCode }),
+      });
+      setBrief(generated);
+    } catch (requestError) {
+      setBriefError(requestError.message);
+    } finally {
+      setBriefGenerating(false);
+    }
+  }
+
   return <div className="app-shell">
     <header className="topbar"><a className="brand" href="#top"><span className="brand-mark">HI</span>
       <span><strong>Humanitarian Intelligence</strong><small>Evidence for better decisions</small></span></a>
@@ -290,6 +380,8 @@ function App() {
         <SummaryCards country={country} indicator={indicator} observation={observation} rank={rank}
           total={ranked.length} coverage={{ loaded: countryData.length, expected: indicators.length }}
           newestYear={newestYear} sourceCount={sourceCount} />
+        <AIBriefPanel country={country} brief={brief} loading={briefLoading}
+          generating={briefGenerating} error={briefError} generate={generateBrief} />
         <section className="dashboard-grid"><ComparisonChart data={ranked} countryCode={countryCode} indicator={indicator} />
           <CountryProfile country={country} countryCode={countryCode} rows={countryData}
             indicatorCode={indicatorCode} selectIndicator={setIndicatorCode} /></section>

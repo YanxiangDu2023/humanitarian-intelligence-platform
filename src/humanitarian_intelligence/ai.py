@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 from typing import Protocol
 
 from openai import AuthenticationError, OpenAI, OpenAIError, PermissionDeniedError, RateLimitError
@@ -45,6 +46,8 @@ class CountryBriefResponse(BaseModel):
     risks: list[GroundedFinding]
     data_limitations: list[str]
     methodology_notes: list[str]
+    generated_at: datetime | None = None
+    cached: bool = False
 
 
 class CountryBriefGenerationError(RuntimeError):
