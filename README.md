@@ -120,6 +120,15 @@ npm run dev
 Open `http://127.0.0.1:5173`. On networks that inspect HTTPS traffic, run the install as
 `NODE_OPTIONS=--use-system-ca npm install` so Node uses the macOS system trust store.
 
+## Deploy to Azure
+
+The production layout uses Azure Static Web Apps for the React dashboard, Azure Container
+Apps for the FastAPI service, and Azure Database for PostgreSQL Flexible Server. The backend
+container listens on `0.0.0.0:8000`; database credentials, the OpenAI key, and allowed frontend
+origins are supplied as Azure environment variables and secrets rather than committed files.
+
+See `docs/azure-deployment.md` for the deployment sequence and cost controls.
+
 The dashboard shows the latest cross-country comparison and a historical trend chart.
 The trend chart supports one to three countries, a selectable year range, and preserves
 missing observations as gaps instead of silently converting them to zero.

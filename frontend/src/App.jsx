@@ -11,6 +11,7 @@ import {
 } from "recharts";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+const AI_GENERATION_ENABLED = import.meta.env.VITE_ENABLE_AI_GENERATION !== "false";
 
 async function fetchJson(path, signal, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, { ...options, signal });
@@ -126,19 +127,21 @@ function FindingCard({ finding, tone }) {
   </article>;
 }
 
-function AIBriefPanel({ country, brief, loading, generating, error, generate }) {
+function AIBriefPanel({ country, brief, loading, generating, error, generate, generationEnabled }) {
   const buttonLabel = generating ? "Generating…" : brief ? "Regenerate analysis" : "Generate AI analysis";
   return <section className="panel ai-panel">
     <header className="panel-header ai-header"><div><span className="section-kicker">Grounded AI country brief</span>
       <h2>{country?.country_name || "Country"} evidence synthesis</h2></div>
-      <button type="button" className="ai-action" disabled={generating || loading} onClick={generate}>
+      {generationEnabled && <button type="button" className="ai-action" disabled={generating || loading} onClick={generate}>
         {generating && <span className="button-spinner" />}{buttonLabel}
-      </button></header>
+      </button>}</header>
     {loading ? <div className="ai-empty"><span className="spinner" /> Loading saved analysis…</div>
       : error ? <div className="ai-message error-state"><strong>AI analysis unavailable</strong><span>{error}</span></div>
         : !brief ? <div className="ai-empty"><div className="ai-orb">AI</div><div>
           <strong>No saved analysis for this country yet.</strong>
-          <span>Generate one grounded in the verified indicators below. The result will be saved and reused.</span>
+          <span>{generationEnabled
+            ? "Generate one grounded in the verified indicators below. The result will be saved and reused."
+            : "A saved analysis has not been published for this country yet."}</span>
         </div></div>
           : <div className="brief-content">
             <div className="brief-summary"><span>Executive summary</span><p>{brief.executive_summary}</p>
@@ -381,7 +384,8 @@ function App() {
           total={ranked.length} coverage={{ loaded: countryData.length, expected: indicators.length }}
           newestYear={newestYear} sourceCount={sourceCount} />
         <AIBriefPanel country={country} brief={brief} loading={briefLoading}
-          generating={briefGenerating} error={briefError} generate={generateBrief} />
+          generating={briefGenerating} error={briefError} generate={generateBrief}
+          generationEnabled={AI_GENERATION_ENABLED} />
         <section className="dashboard-grid"><ComparisonChart data={ranked} countryCode={countryCode} indicator={indicator} />
           <CountryProfile country={country} countryCode={countryCode} rows={countryData}
             indicatorCode={indicatorCode} selectIndicator={setIndicatorCode} /></section>

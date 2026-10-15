@@ -1,11 +1,12 @@
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from hashlib import sha256
+from secrets import compare_digest
 from typing import Annotated
 
 import psycopg
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from psycopg import Connection
 from psycopg.rows import dict_row
@@ -102,12 +103,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:5173",
-        "http://localhost:5173",
-        "http://127.0.0.1:5174",
-        "http://localhost:5174",
-    ],
+    allow_origins=list(get_settings().allowed_origins),
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
@@ -116,7 +112,7 @@ app.add_middleware(
 
 def get_connection() -> Iterator[Connection]:
     settings = get_settings()
-    with psycopg.connect(settings.database_url, row_factory=dict_row) as connection:
+    with psycopg.connect(settings.resolved_database_url, row_factory=dict_row) as connection:
         yield connection
 
 
@@ -133,6 +129,22 @@ def get_country_brief_generator() -> OpenAICountryBriefGenerator:
 CountryBriefGenerator = Annotated[
     OpenAICountryBriefGenerator, Depends(get_country_brief_generator)
 ]
+
+
+def require_ai_generation_key(
+    x_admin_key: Annotated[str | None, Header()] = None,
+) -> None:
+    configured_key = get_settings().ai_generation_key
+    if configured_key is None:
+        return
+    if x_admin_key is None or not compare_digest(
+        x_admin_key,
+        configured_key.get_secret_value(),
+    ):
+        raise HTTPException(status_code=403, detail="AI generation is restricted")
+
+
+AIGenerationAccess = Annotated[None, Depends(require_ai_generation_key)]
 
 
 @app.get("/health", response_model=HealthResponse, tags=["system"])
@@ -380,6 +392,7 @@ def create_country_brief(
     request: CountryBriefRequest,
     connection: DatabaseConnection,
     generator: CountryBriefGenerator,
+    _access: AIGenerationAccess,
 ) -> CountryBriefResponse:
     analysis = get_country_analysis(request.country_iso3, connection)
     try:
@@ -542,4 +555,9 @@ def get_indicator_trends(
 
 
 def run() -> None:
-    uvicorn.run("humanitarian_intelligence.api:app", host="127.0.0.1", port=8000)
+    settings = get_settings()
+    uvicorn.run(
+        "humanitarian_intelligence.api:app",
+        host=settings.api_host,
+        port=settings.api_port,
+    )

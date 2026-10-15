@@ -2,10 +2,19 @@ from collections.abc import Iterator
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
+import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from humanitarian_intelligence.ai import BriefFindingDraft, CountryBriefDraft
-from humanitarian_intelligence.api import app, get_connection, get_country_brief_generator
+from humanitarian_intelligence.api import (
+    app,
+    get_connection,
+    get_country_brief_generator,
+    require_ai_generation_key,
+)
+from humanitarian_intelligence.config import get_settings
 
 COMPARISON_ROW = {
     "country_iso3": "KEN",
@@ -274,3 +283,16 @@ def test_missing_saved_country_brief_returns_404() -> None:
     assert response.status_code == 404
     assert response.json() == {"detail": "No saved AI brief found"}
     app.dependency_overrides.clear()
+
+
+def test_ai_generation_key_rejects_public_requests() -> None:
+    settings = get_settings()
+    original_key = settings.ai_generation_key
+    settings.ai_generation_key = SecretStr("deployment-secret")
+    try:
+        with pytest.raises(HTTPException) as error:
+            require_ai_generation_key("wrong-secret")
+        assert error.value.status_code == 403
+        require_ai_generation_key("deployment-secret")
+    finally:
+        settings.ai_generation_key = original_key

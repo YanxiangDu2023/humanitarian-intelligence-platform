@@ -1,4 +1,5 @@
 from functools import lru_cache
+from urllib.parse import quote
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -7,7 +8,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
-    database_url: str = "postgresql://humanitarian:humanitarian@localhost:5433/humanitarian"
+    database_url: str | None = None
+    database_host: str = "localhost"
+    database_port: int = Field(default=5433, ge=1, le=65535)
+    database_name: str = "humanitarian"
+    database_user: str = "humanitarian"
+    database_password: SecretStr | None = None
     world_bank_countries: str = (
         "ARG,AUS,BRA,DEU,FRA,GBR,ITA,JPN,KOR,MEX,RUS,SAU,TUR,USA,ZAF,JOR,KEN"
     )
@@ -24,6 +30,10 @@ class Settings(BaseSettings):
     http_timeout_seconds: float = Field(default=30, gt=0)
     openai_api_key: SecretStr | None = None
     openai_model: str = "gpt-6-luna"
+    ai_generation_key: SecretStr | None = None
+    api_host: str = "127.0.0.1"
+    api_port: int = Field(default=8000, ge=1, le=65535)
+    cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
 
     @property
     def countries(self) -> tuple[str, ...]:
@@ -36,6 +46,23 @@ class Settings(BaseSettings):
     @property
     def unicef_indicator_codes(self) -> tuple[str, ...]:
         return _csv_values(self.unicef_indicators)
+
+    @property
+    def allowed_origins(self) -> tuple[str, ...]:
+        return _csv_values(self.cors_origins)
+
+    @property
+    def resolved_database_url(self) -> str:
+        if self.database_url:
+            return self.database_url
+        password = ""
+        if self.database_password is not None:
+            password = f":{quote(self.database_password.get_secret_value(), safe='')}"
+        return (
+            f"postgresql://{quote(self.database_user, safe='')}{password}"
+            f"@{self.database_host}:{self.database_port}/{self.database_name}"
+            "?sslmode=require"
+        )
 
 
 def _csv_values(value: str) -> tuple[str, ...]:

@@ -20,7 +20,7 @@ def main() -> None:
     args = build_parser().parse_args()
     settings = get_settings()
 
-    with connect(settings.database_url) as connection:
+    with connect(settings.resolved_database_url) as connection:
         if args.command == "init-db":
             initialize_database(connection)
             print("Database schemas and tables initialized.")
