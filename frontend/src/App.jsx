@@ -71,12 +71,14 @@ function SummaryCards({ country, indicator, observation, rank, total, coverage, 
   </section>;
 }
 
-function ComparisonChart({ data, countryCode, indicator }) {
+function ComparisonChart({ data, countryCode, indicator, loading, error }) {
   const maxValue = Math.max(...data.map((item) => item.observation_value), 1);
   return <article className="panel comparison-panel">
     <header className="panel-header"><div><span className="section-kicker">Cross-country comparison</span>
       <h2>{indicator?.indicator_name}</h2></div><span className="unit-pill">Unit: {indicator?.unit}</span></header>
-    <div className="chart-wrap" role="img" aria-label={`Country comparison for ${indicator?.indicator_name}`}>
+    {loading ? <div className="chart-status"><span className="spinner" /> Updating comparison…</div>
+      : error ? <div className="chart-status error-state">Comparison unavailable: {error}</div>
+        : <div className="chart-wrap" role="img" aria-label={`Country comparison for ${indicator?.indicator_name}`}>
       <div className="bar-chart-scale"><span>0</span><span>Reported value</span>
         <span>{formatValue(maxValue, indicator?.unit)}</span></div>
       {data.map((item) => <div
@@ -89,7 +91,7 @@ function ComparisonChart({ data, countryCode, indicator }) {
         <span className="bar-value">{formatValue(item.observation_value, item.unit)}</span>
         <span className="bar-year">{item.observation_year}</span>
       </div>)}
-    </div>
+    </div>}
     <p className="panel-note"><span className="info-dot">i</span> Values use each country’s latest available
       observation; years can differ. Hover over a bar for the country name and source year.</p>
   </article>;
@@ -242,6 +244,8 @@ function App() {
   const [indicatorCode, setIndicatorCode] = useState("ED_SE_LPV_PRIM");
   const [countryData, setCountryData] = useState([]);
   const [comparisonData, setComparisonData] = useState([]);
+  const [comparisonLoading, setComparisonLoading] = useState(true);
+  const [comparisonError, setComparisonError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
@@ -264,17 +268,28 @@ function App() {
       fetchJson("/api/v1/countries", controller.signal),
       fetchJson("/api/v1/indicators", controller.signal),
       fetchJson(`/api/v1/countries/${countryCode}/indicators`, controller.signal),
-      fetchJson(`/api/v1/comparisons/${indicatorCode}`, controller.signal),
-    ]).then(([countryRows, indicatorRows, profileRows, comparisonRows]) => {
+    ]).then(([countryRows, indicatorRows, profileRows]) => {
       setCountries(countryRows);
       setIndicators(indicatorRows);
       setCountryData(profileRows);
-      setComparisonData(comparisonRows);
     }).catch((requestError) => {
       if (requestError.name !== "AbortError") setError(requestError.message);
     }).finally(() => setLoading(false));
     return () => controller.abort();
-  }, [countryCode, indicatorCode, reload]);
+  }, [countryCode, reload]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setComparisonLoading(true);
+    setComparisonError("");
+    fetchJson(`/api/v1/comparisons/${indicatorCode}`, controller.signal)
+      .then(setComparisonData)
+      .catch((requestError) => {
+        if (requestError.name !== "AbortError") setComparisonError(requestError.message);
+      })
+      .finally(() => setComparisonLoading(false));
+    return () => controller.abort();
+  }, [indicatorCode, reload]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -313,7 +328,9 @@ function App() {
     () => [...comparisonData].sort((a, b) => b.observation_value - a.observation_value),
     [comparisonData],
   );
-  const rank = ranked.findIndex((item) => item.country_iso3 === countryCode) + 1;
+  const rank = comparisonLoading
+    ? 0
+    : ranked.findIndex((item) => item.country_iso3 === countryCode) + 1;
   const newestYear = countryData.length ? Math.max(...countryData.map((item) => item.observation_year)) : null;
   const sourceCount = new Set(countryData.map((item) => item.source_name)).size;
   const trendChartData = useMemo(() => {
@@ -386,7 +403,8 @@ function App() {
         <AIBriefPanel country={country} brief={brief} loading={briefLoading}
           generating={briefGenerating} error={briefError} generate={generateBrief}
           generationEnabled={AI_GENERATION_ENABLED} />
-        <section className="dashboard-grid"><ComparisonChart data={ranked} countryCode={countryCode} indicator={indicator} />
+        <section className="dashboard-grid"><ComparisonChart data={ranked} countryCode={countryCode}
+          indicator={indicator} loading={comparisonLoading} error={comparisonError} />
           <CountryProfile country={country} countryCode={countryCode} rows={countryData}
             indicatorCode={indicatorCode} selectIndicator={setIndicatorCode} /></section>
         <TrendPanel countries={countries} indicator={indicator} selectedCountries={trendCountries}

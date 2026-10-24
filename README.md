@@ -38,6 +38,16 @@ are not necessarily annual.
 
 ## Architecture
 
+The repository is organized as a small monorepo:
+
+```text
+humanitarian-intelligence-platform/
+├── backend/   Python, FastAPI, ETL, SQL, and backend tests
+├── frontend/  React dashboard
+├── docs/      Architecture and deployment notes
+└── docker-compose.yml
+```
+
 ```text
 World Bank API ─┐
                 ├─> bronze.api_responses            source payloads
@@ -59,8 +69,9 @@ UNICEF SDMX API ┘              |
 Prerequisites: Python 3.11+ and Docker.
 
 ```bash
-cp .env.example .env
 docker compose up -d
+cd backend
+cp .env.example .env
 python -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
@@ -136,6 +147,7 @@ missing observations as gaps instead of silently converting them to zero.
 Run checks:
 
 ```bash
+cd backend
 python -m pytest
 ruff check .
 ```

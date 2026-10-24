@@ -40,10 +40,12 @@ environment variable.
 1. Sign in with the Azure CLI and select the intended subscription.
 2. Create a resource group in the selected Azure region.
 3. Create the PostgreSQL Flexible Server and database.
-4. Run `humanitarian-etl init-db`, `world-bank`, `unicef`, and `validate` against Azure.
-5. Build and deploy the Dockerfile to Azure Container Apps with external ingress on port 8000.
+4. From `backend/`, run `humanitarian-etl init-db`, `world-bank`, `unicef`, and `validate`
+   against Azure.
+5. Build `backend/Dockerfile` with `backend/` as its build context and deploy it to Azure
+   Container Apps with external ingress on port 8000.
 6. Add `DATABASE_URL` and `OPENAI_API_KEY` as Container Apps secrets.
-7. Create the Static Web App from the GitHub repository's `frontend` directory.
+7. Create the Static Web App from the GitHub repository's `frontend/` directory.
 8. Set `VITE_API_BASE_URL` during the frontend build and set the resulting site URL in
    `CORS_ORIGINS` on the Container App.
 9. Verify `/health`, the dashboard, a saved brief, and one regeneration request.

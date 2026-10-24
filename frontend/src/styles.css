@@ -195,6 +195,8 @@ select:focus { border-color: #168c91; box-shadow: 0 0 0 3px rgba(22, 140, 145, 0
 .error-state { color: #b64f3b; }
 .spinner { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #bddcda; border-top-color: #0e747a; animation: spin 1s linear infinite; }
 .state-symbol { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; border: 2px solid currentColor; font-weight: 900; }
+.chart-status { min-height: 440px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #60757b; font-size: 13px; font-weight: 750; }
+.chart-status .spinner { flex: 0 0 auto; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .site-footer { min-height: 74px; padding: 0 clamp(24px, 5vw, 76px); display: flex; align-items: center; justify-content: space-between; gap: 20px; border-top: 1px solid #dde7e5; color: #7c8e93; font-size: 11px; background: white; }

@@ -1,0 +1,56 @@
+name: Deploy API to Azure
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - backend/**
+      - .github/workflows/deploy-api.yml
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: azure-api-production
+  cancel-in-progress: true
+
+env:
+  ACR_LOGIN_SERVER: ca07141eda6bacr.azurecr.io
+  IMAGE_NAME: hip-api
+  RESOURCE_GROUP: humanitarian-intelligence-rg
+  CONTAINER_APP: hip-api
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: 2e294904-cb9a-4c62-a43b-ce008818ea2f
+          tenant-id: 882c7159-1f5b-49f4-bbde-049b9d1371e7
+          subscription-id: a8e6cd7f-3bbf-4590-9e78-26156516b147
+
+      - name: Build and push API image
+        run: |
+          az acr login --name ca07141eda6bacr
+          docker build \
+            --file backend/Dockerfile \
+            --tag "$ACR_LOGIN_SERVER/$IMAGE_NAME:$GITHUB_SHA" \
+            backend
+          docker push "$ACR_LOGIN_SERVER/$IMAGE_NAME:$GITHUB_SHA"
+
+      - name: Deploy API revision
+        run: |
+          az containerapp update \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "$ACR_LOGIN_SERVER/$IMAGE_NAME:$GITHUB_SHA"
+          az containerapp ingress update \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --target-port 8000
