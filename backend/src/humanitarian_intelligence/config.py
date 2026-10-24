@@ -1,12 +1,18 @@
 from functools import lru_cache
+from pathlib import Path
 from urllib.parse import quote
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=BACKEND_DIR / ".env",
+        env_file_encoding="utf-8",
+    )
 
     database_url: str | None = None
     database_host: str = "localhost"
@@ -34,6 +40,7 @@ class Settings(BaseSettings):
     api_host: str = "127.0.0.1"
     api_port: int = Field(default=8000, ge=1, le=65535)
     cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
+    mcp_api_base_url: str = "http://127.0.0.1:8000"
 
     @property
     def countries(self) -> tuple[str, ...]:

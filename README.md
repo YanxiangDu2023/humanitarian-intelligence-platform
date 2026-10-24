@@ -131,6 +131,23 @@ npm run dev
 Open `http://127.0.0.1:5173`. On networks that inspect HTTPS traffic, run the install as
 `NODE_OPTIONS=--use-system-ca npm install` so Node uses the macOS system trust store.
 
+## Use the data through MCP
+
+The backend includes a read-only Model Context Protocol server for AI clients. It wraps the
+existing REST API, so the MCP process never receives PostgreSQL credentials and cannot trigger
+paid AI generation.
+
+From `backend/`, point it at either a local API or the deployed Azure API:
+
+```bash
+export MCP_API_BASE_URL=http://127.0.0.1:8000
+humanitarian-mcp
+```
+
+Use `mcp dev src/humanitarian_intelligence/mcp_server.py` to inspect the tools locally. The
+server exposes country and indicator catalogues, country profiles, comparisons, trends, and
+saved AI briefs over the default local `stdio` transport.
+
 ## Deploy to Azure
 
 The production layout uses Azure Static Web Apps for the React dashboard, Azure Container

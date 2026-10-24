@@ -11,14 +11,17 @@ requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115,<1",
   "httpx>=0.28,<1",
+  "mcp>=2.3,<3",
   "openai>=2.30,<3",
   "psycopg[binary]>=3.2,<4",
   "pydantic-settings>=2.7,<3",
+  "truststore>=0.10,<1",
   "uvicorn[standard]>=0.34,<1",
 ]
 
 [project.optional-dependencies]
 dev = [
+  "mcp[cli]>=2.3,<3",
   "pytest>=8.3,<9",
   "ruff>=0.9,<1",
 ]
@@ -27,6 +30,7 @@ dev = [
 humanitarian-etl = "humanitarian_intelligence.cli:main"
 humanitarian-probe = "humanitarian_intelligence.source_probe:main"
 humanitarian-api = "humanitarian_intelligence.api:run"
+humanitarian-mcp = "humanitarian_intelligence.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
